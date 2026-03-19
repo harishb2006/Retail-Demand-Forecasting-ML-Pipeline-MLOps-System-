@@ -1,0 +1,5 @@
+retail-forecasting-mlops/data/
+retail-forecasting-mlops/mlruns/
+retail-forecasting-mlops/models/
+*.pkl
+__pycache__/
