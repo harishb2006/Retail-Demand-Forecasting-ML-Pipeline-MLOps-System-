@@ -2,8 +2,8 @@ import pandas as pd
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Generate new features for model training.
+    Add lag features and rolling mean.
     """
-    # Add feature engineering steps here
-    # return df
-    pass
+    df['lag_1'] = df['sales'].shift(1)
+    df['rolling_mean'] = df['sales'].rolling(7).mean()
+    return df
