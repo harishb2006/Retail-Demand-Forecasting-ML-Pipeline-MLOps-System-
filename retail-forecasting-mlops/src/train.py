@@ -1,7 +1,12 @@
 import mlflow
 import mlflow.sklearn
+import mlflow.xgboost
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.model_selection import train_test_split
 import joblib
 import os
 
@@ -35,28 +40,53 @@ def train_model():
         if 'store_nbr' in df.columns:
             features.append('store_nbr')
             
-        X_train = df[features]
-        y_train = df['sales']
+        X = df[features]
+        y = df['sales']
+        
+        # Train-test split
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
         # Train model on a subset to ensure this runs fast
-        print("Training model...")
         X_train_sub = X_train.head(10000)
         y_train_sub = y_train.head(10000)
+        X_test_sub = X_test.head(2000)
+        y_test_sub = y_test.head(2000)
         
-        model = RandomForestRegressor(n_estimators=10, max_depth=5, random_state=42)
-        model.fit(X_train_sub, y_train_sub)
+        # --- Baseline Model ---
+        print("Training Linear Regression (Baseline)...")
+        lr_model = LinearRegression()
+        lr_model.fit(X_train_sub, y_train_sub)
         
-        # Log parameters
-        mlflow.log_param("n_estimators", 10)
+        lr_preds = lr_model.predict(X_test_sub)
+        lr_rmse = np.sqrt(mean_squared_error(y_test_sub, lr_preds))
+        lr_mae = mean_absolute_error(y_test_sub, lr_preds)
+        print(f"Linear Regression - RMSE: {lr_rmse:.2f}, MAE: {lr_mae:.2f}")
+
+        # --- Better Model ---
+        print("Training XGBoost...")
+        xgb_model = XGBRegressor(n_estimators=50, max_depth=5, random_state=42)
+        xgb_model.fit(X_train_sub, y_train_sub)
+        
+        xgb_preds = xgb_model.predict(X_test_sub)
+        xgb_rmse = np.sqrt(mean_squared_error(y_test_sub, xgb_preds))
+        xgb_mae = mean_absolute_error(y_test_sub, xgb_preds)
+        print(f"XGBoost - RMSE: {xgb_rmse:.2f}, MAE: {xgb_mae:.2f}")
+        
+        # Log parameters and metrics for the better model
+        mlflow.log_param("model_type", "XGBoost")
+        mlflow.log_param("n_estimators", 50)
         mlflow.log_param("max_depth", 5)
+        mlflow.log_metric("rmse", xgb_rmse)
+        mlflow.log_metric("mae", xgb_mae)
         
-        # Log and save model
-        mlflow.sklearn.log_model(model, "model")
+        # Log and save models
+        mlflow.sklearn.log_model(lr_model, "baseline_model")
+        mlflow.xgboost.log_model(xgb_model, "model")
         
-        # Save model locally in models dir
+        # Save XGBoost model locally in models dir
         os.makedirs("models", exist_ok=True)
-        joblib.dump(model, "models/model.pkl")
-        print("Training completed and model saved!")
+        joblib.dump(xgb_model, "models/model.pkl")
+        print("Training completed and models saved!")
 
 if __name__ == "__main__":
     train_model()

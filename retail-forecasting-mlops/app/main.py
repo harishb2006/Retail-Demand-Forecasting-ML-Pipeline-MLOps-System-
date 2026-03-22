@@ -1,24 +1,28 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+import joblib
+import pandas as pd
+import os
 
 app = FastAPI(title="Retail Forecasting MLOps API", version="1.0")
 
-class PredictRequest(BaseModel):
-    # Add relevant input features here
-    feature1: float
-    feature2: float
+# Attempt to load model
+model_path = "models/model.pkl"
+try:
+    model = joblib.load(model_path)
+except FileNotFoundError:
+    # Handle the case where the model hasn't been trained yet
+    model = None
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Retail Forecasting MLOps API"}
 
 @app.post("/predict")
-def predict(request: PredictRequest):
-    # TODO: Load model and make prediction
-    # from src.predict import make_prediction
-    # prediction = make_prediction(request.dict())
-    
-    return {
-        "prediction": "dummy_value",
-        "status": "success"
-    }
+def predict(data: dict):
+    if model is None:
+        return {"error": "Model not found. Please train the model first."}
+        
+    # convert to dataframe
+    df = pd.DataFrame([data])
+    prediction = model.predict(df)
+    return {"prediction": prediction.tolist()}
